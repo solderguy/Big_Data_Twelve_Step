@@ -1,10 +1,11 @@
 Can chemically dependent points become productive members of a text society through a twelve-step program?
 
-Output results are already available as PDFs in the image_files folder  
+Output results are already available as PDFs in the image_files folder.  
+
 The bash script run_me.sh fires up twelve tools for the twelve steps:      
 
 1.  **Python** program encodes bitmap characters into JSON format with numerous flaws  
-2.  ** Hadoop Streaming** discards invalid JSON records  
+2.  **Hadoop Streaming** discards invalid JSON records  
 3.  **Hive** table used to store points before transfer to MySQL with Sqoop  
 4.  **MySQL** script copies the points into another table while removing nulls   
 5.  **Sqoop** transfer back to Hive, X and Y values of points are then split up  
