@@ -1,4 +1,14 @@
 package jsoper.pair.s11seqfile;
+/**
+ * This program is the eleventh part of the Big Data 12 Step Program
+ *
+ * It reads the text file produced by Mahout and writes the data
+ * out in Sequence File format
+ *  
+ * @author John Soper
+ *
+ */
+
 
 import java.io.File;
 import java.io.IOException;
@@ -6,6 +16,7 @@ import java.util.StringTokenizer;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -15,8 +26,11 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
 
-public class Text2SeqFile {
+
+public class Text2SeqFile extends Configured implements Tool {
 	public static class Map extends Mapper<LongWritable, Text, Text, Text> {
 		private Text wordX = new Text();
 		private Text wordY = new Text();
@@ -33,15 +47,12 @@ public class Text2SeqFile {
 				wordY.set(tokenizer.nextToken());
 				wordCl.set(tokenizer.nextToken());
 				wordXY.set(wordX.toString() + "," + wordY.toString());
-				// System.out.println("word3: " + word3.toString() + " word4: "
-				// + word4.toString());
-
 				context.write(wordCl, wordXY);
 			}
 		}
 	}
 
-	public static void main(String[] args) throws Exception {
+	public int run(String[] args) throws Exception {
 
 		// delete output folder
 		File outputFolder = new File("out_s11");
@@ -56,18 +67,21 @@ public class Text2SeqFile {
 
 		job.setMapperClass(Map.class);
 
-		// increase if you need sorting or a special number of files
+		// increase if you need key sorting or a specific number of output files
 		job.setNumReduceTasks(0);
 
 		job.setInputFormatClass(TextInputFormat.class);
-		// job.setOutputFormatClass(TextOutputFormat.class);
 		job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
 		FileInputFormat.addInputPath(job, new Path("out_s10"));
 		FileOutputFormat.setOutputPath(job, new Path("out_s11"));
 
 		job.waitForCompletion(true);
-		System.out.println("done with Step 11");
-
+		return 1;
+	}
+	
+	public static void main(String args[]) throws Exception {
+		int exitCode = ToolRunner.run(new Text2SeqFile(), args);
+		System.exit(exitCode);
 	}
 }

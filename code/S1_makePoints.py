@@ -1,5 +1,24 @@
 """
-Write both valid and corrupt bitmap points in JSON format
+CREDENTIALS
+  Module: S1_makePoints.py
+  Author: John Soper
+  Date: Apr 2015
+  Rev: 1
+
+SUMMARY
+    This is the first component of the Big Data Twelve Step Program project
+    It encodes the phrase "big data" into bit field, but then adds ugly borders,
+    random noise, and duplicates (all as x,y points)
+
+    The final set of points is then encoded into JSON format and a few extra
+        corrupt records are created
+
+    Technically it no longer needs the big huge array (that was for deriving
+       points), but it's not worth the trouble to change
+
+REQUIREMENTS
+   numpy module 
+
 """
 
 import numpy as np
@@ -205,8 +224,8 @@ def write_csv_file(full):
             	target.write(my_str)
                 sn += 1
 
-   # example output
-   # {"point" : [ {"sn" : "186"}, {"x" : "null"}, {"y" : "119"} ] }
+    # example output
+    # {"point" : [ {"sn" : "186"}, {"x" : "null"}, {"y" : "119"} ] }
     
     
     # insert some null values

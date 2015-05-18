@@ -1,10 +1,27 @@
 package jsoper.com.pair
 
-/*
-Error when running from sbt on command line, but safe to ignore.  See
-http://stackoverflow.com/questions/28362341/error-utils-uncaught-exception-in-thread-sparklistenerbus
-for details
-*/
+/**
+ * @author John Soper
+ * @revision 1  May 17, 2015
+ 
+ * This program is the twelfth part of the Big Data 12 Step Program
+ *
+ * It runs Apache Spark coded with Scala to separately analyze each
+ * cluster (aka character) to detect its value
+ *
+ * The decoded phrase is then written out to a text file
+ * Lots of RDD focus to gain practice in programming at scale even
+ * though it was not needed for this project
+ *
+ *
+ *
+ * ISSUES:
+ *   Error when running from sbt on command line, due to context cleaner
+ *   but safe to ignore.  See
+ *   http://stackoverflow.com/questions/28362341/error-utils-uncaught-exception-in-thread-sparklistenerbus
+ *   for details
+ */
+
 import scala.collection.mutable.ListBuffer
 
 import org.apache.hadoop.io.Text
@@ -15,51 +32,12 @@ import org.apache.spark.SparkContext.rddToOrderedRDDFunctions
 import org.apache.spark.SparkContext.rddToPairRDDFunctions
 import org.apache.spark.rdd.RDD
 import org.slf4j.LoggerFactory
-//import grizzled.slf4j.Logging
 import java.nio.file.{ Paths, Files }
 import java.nio.charset.StandardCharsets
 import java.io.IOException
+import org.slf4j.LoggerFactory
 
-//object ClusterProcessing with Logging {
 object ClusterProcessing {
-  def main(args: Array[String]): Unit = {
-    val conf = new SparkConf().setAppName("Simple Application")
-    val sc = new SparkContext("local", "HW2", conf)
-
-    val file = sc.sequenceFile("outS11", classOf[Text], classOf[Text])
-    val map = file.map { case (k, v) => (k.toString(), v.toString()) }
-    val sortedOutput = map.sortByKey(true)
-    println("Number of data points: " + sortedOutput.count);
-
-    // Create Centroid RDD for the 7 clusters
-    val centroids = calcCentroids(sc, sortedOutput)
-    centroids foreach { case (s, n) => println(s + " " + n) }
-
-    // Determine word and character order
-    val initialRandomOrder = ListBuffer[String]("4", "2", "5", "0", "1", "6", "3")
-    val finalOrder = sortYAxis(initialRandomOrder, centroids)
-
-    // Character recognition
-    val finalLetters = CharRecognition.decodeAll(sortedOutput, finalOrder)
-
-    val finalLetterString = finalLetters.mkString("")
-    println("\nDecoded Value: " + finalLetterString + "\n")
-    Files.deleteIfExists(Paths.get("myfile.txt"))
-    Files.write(Paths.get("outS12.txt"),
-      finalLetterString.getBytes(StandardCharsets.UTF_8))
-
-//    try {
-//      sc.stop()
-//    } catch {
-//      case ex: IOException => {
-//        println("Caught IO Exception")
-//        }
-//      case _: Exception => {
-//        println("Caught some other Exception")
-//      }
-//    }
-
-  }
 
   def sortYAxis(remaining: ListBuffer[String],
                 centroids: RDD[(String, Double)]): ListBuffer[String] = {
@@ -94,6 +72,7 @@ object ClusterProcessing {
   def sortXAxis(scratchpad: ListBuffer[String],
                 finalOrder: ListBuffer[String],
                 centroids: RDD[(String, Double)]): Unit = {
+
     var minX = 1E9
     var x = 1E9
 
@@ -119,8 +98,8 @@ object ClusterProcessing {
   }
 
   def getXCentroidVal(clusNum: String, centroids: RDD[(String, Double)]): Double = {
-    val arr = centroids.lookup(clusNum + "x").toArray
-    arr(0)
+     val arr = centroids.lookup(clusNum + "x").toArray
+     arr(0)
   }
 
   def getYCentroidVal(clusNum: String, centroids: RDD[(String, Double)]): Double = {
@@ -129,6 +108,7 @@ object ClusterProcessing {
   }
 
   def calcCentroids(sc: SparkContext, in: RDD[(String, String)]): RDD[(String, Double)] = {
+    //in.foreach(println)
     val clusMeans = scala.collection.mutable.MutableList[(String, Double)]()
     clusMeans += "0x" -> getMean(in, "0", "x")
     clusMeans += "0y" -> getMean(in, "0", "y")
@@ -153,9 +133,9 @@ object ClusterProcessing {
 
     val clusDoubles =
       if (axis.equals("x"))
-        clusXY.map(ClusterProcessing.convXCoordDouble)
+        clusXY.map(this.convXCoordDouble)
       else
-        clusXY.map(ClusterProcessing.convYCoordDouble)
+         clusXY.map(this.convYCoordDouble)
     val avg = clusDoubles.map { case (pt) => (pt) }.mean()
     avg
   }
@@ -170,5 +150,32 @@ object ClusterProcessing {
     val tokens = in.split(",").map(_.trim)
     var y: Double = tokens(1).toDouble
     (y)
+  }
+
+ def main(args: Array[String]): Unit = {
+    val conf = new SparkConf().setAppName("Simple Application")
+    val sc = new SparkContext("local", "HW2", conf)
+
+    val file = sc.sequenceFile(args(0), classOf[Text], classOf[Text])
+    val map = file.map { case (k, v) => (k.toString(), v.toString()) }
+    val sortedOutput = map.sortByKey(true)
+    //println("Number of data points: " + sortedOutput.count);
+
+    // Create Centroid RDD for the 7 clusters
+    val centroids = calcCentroids(sc, sortedOutput)
+    //centroids foreach { case (s, n) => println(s + " " + n) }
+
+    // Determine word and character order
+    val initialRandomOrder = ListBuffer[String]("4", "2", "5", "0", "1", "6", "3")
+    val finalOrder = sortYAxis(initialRandomOrder, centroids)
+
+    // Character recognition
+    val finalLetters = CharRecognition.decodeAll(sortedOutput, finalOrder)
+
+    val finalLetterString = finalLetters.mkString("")
+    println("\nDecoded Value: " + finalLetterString + "\n")
+    Files.deleteIfExists(Paths.get(args(1)))
+    Files.write(Paths.get(args(1)),
+      finalLetterString.getBytes(StandardCharsets.UTF_8))
   }
 }

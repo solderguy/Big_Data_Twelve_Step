@@ -1,6 +1,15 @@
+# CREDENTIALS
+#   Module: S8.R
+#   Author: John Soper
+#   Date: Apr 2015
+#   Rev: 1
+#
+# SUMMARY
+#     This is the eigth component of the Big Data Twelve Step Program
+#     It runs R code to remove the border and outlier points.  After this
+#     step, the only undesired points left of the noise ones interspersed w
+#     with the valid data 
 
-# setwd("/Users/john/twelve/scripts")
-getwd()
 
 d<-read.table("../output_files/out_s7.tab", header = TRUE,
      sep="\t", colClasses=c("numeric","numeric","numeric"))

@@ -1,5 +1,13 @@
 package jsoper.com.pair
 
+/**
+ * @author John Soper
+ * @revision 1  May 17, 2015
+ * 
+ * This is a support module for ClusterProcessing, it handles the 
+ * more abstract activities
+ */
+
 import scala.collection.mutable.ListBuffer
 
 import org.apache.hadoop.io.Text
@@ -31,7 +39,7 @@ object CharRecognition {
       val symX = calcs._1
       val symY = calcs._2
       val distRatio = calcs._3
-      println(f"symX: $symX%.2f symY: $symY%.2f distRatio: $distRatio%.2f")
+      //println(f"symX: $symX%.2f symY: $symY%.2f distRatio: $distRatio%.2f")
       val decodedChar = identifyChar(symX, symY, distRatio)
       result = decodedChar
     }
@@ -49,12 +57,27 @@ object CharRecognition {
     val distanceRatio = calcDistanceRatio(grid)
     (symmetryX, symmetryY, distanceRatio)
   }
+  
+  def convXCoordDouble(in: String): Double = {
+    val tokens = in.split(",").map(_.trim)
+    var x: Double = tokens(0).toDouble
+    (x)
+  }
+
+  def convYCoordDouble(in: String): Double = {
+    val tokens = in.split(",").map(_.trim)
+    var y: Double = tokens(1).toDouble
+    (y)
+  }
+  
 
   def createAndFillArray(singleCluster: RDD[(String, String)],
                          len: Int): Array[Array[Int]] = {
+    //singleCluster.foreach(println)
+    //println("len: " + len)
     val clusXY = singleCluster.map { case (clus, xy) => (xy) }
-    val clusDoublesX = clusXY.map(ClusterProcessing.convXCoordDouble)
-    val clusDoublesY = clusXY.map(ClusterProcessing.convYCoordDouble)
+    val clusDoublesX = clusXY.map(convXCoordDouble)
+    val clusDoublesY = clusXY.map(convYCoordDouble)
 
     // move point data from RDD into local arrays of type double
     val pointsX = clusDoublesX.collect
@@ -70,8 +93,6 @@ object CharRecognition {
       var yVal = len - 1 - (pointsY(i) - shiftY).toInt
       grid(yVal)(xVal) = 1
     }
-    //println(" ")
-    //println(grid.deep.mkString("\n"))
     grid
   }
 

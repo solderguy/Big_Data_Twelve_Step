@@ -1,5 +1,19 @@
 package jsoper.pair.s09hadoop;
 
+/**
+ * This program is the ninth part of the Big Data 12 Step Program
+ *
+ * It uses a hadoop MapReduce program to remove undesired points intermixed
+ * with keepers.
+ * It breaks the total bitmap into 30x30 zones and deletes points that
+ * are not touching others 
+ * A second job MR job is done with the same code, but with the arrays
+ * shifted diagonally to catch points that were previously on the border
+ * 
+ * @author John Soper
+ * 
+ */
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -20,20 +34,11 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-/**
- * A MapReduce application to count how many movies an actor has appeared in
- * 
- * Accomplishes the sort order by doing a second job with a second mapper (no
- * reduce)
- * 
- * @author john
- * 
- */
 public class PointCleaner extends Configured implements Tool {
 
 	private static final Log LOG = LogFactory.getLog(PointCleaner.class);
-	static int arrayShift = 0;;
-
+	static int arrayShift = 0;
+	
 	public int run(String[] args) throws Exception {
 		Configuration conf = getConf();
 		if (args.length != 2) {
@@ -49,10 +54,10 @@ public class PointCleaner extends Configured implements Tool {
 		// ConfigurationUtil.dumpConfigurations(conf, System.out);
 		LOG.info("input: " + args[0] + " output: " + tempOutputString);
 
-		Job job = new Job(conf, "movie count");
+		Job job = new Job(conf, "point cleaner");
 		job.setJarByClass(PointCleaner.class);
-		job.setMapperClass(MovieTokenizerMapper.class);
-		job.setReducerClass(MovieYearReducer.class);
+		job.setMapperClass(ZoneCleanMapper.class);
+		job.setReducerClass(ZoneCleanReducer.class);
 
 		job.setMapOutputKeyClass(Text.class);
 		job.setMapOutputValueClass(Text.class);
@@ -67,7 +72,7 @@ public class PointCleaner extends Configured implements Tool {
 		LOG.info("****************    Finished first job");
 		if (result == false)
 			return 1;
-		else { // run second job if first succeeds
+		else { // only run second job if first succeeds
 			String[] run2Args = new String[2];
 			run2Args[0] = tempOutputString;
 			run2Args[1] = args[1] + "/final";
@@ -93,8 +98,8 @@ public class PointCleaner extends Configured implements Tool {
 
 		Job job = new Job(conf, "movie count");
 		job.setJarByClass(PointCleaner.class);
-		job.setMapperClass(MovieTokenizerMapper.class);
-		job.setReducerClass(MovieYearReducer.class);
+		job.setMapperClass(ZoneCleanMapper.class);
+		job.setReducerClass(ZoneCleanReducer.class);
 
 		job.setMapOutputKeyClass(Text.class);
 		job.setMapOutputValueClass(Text.class);
@@ -110,7 +115,7 @@ public class PointCleaner extends Configured implements Tool {
 		return (result) ? 0 : 1;
 	}
 
-	public static class MovieTokenizerMapper extends
+	public static class ZoneCleanMapper extends
 			Mapper<LongWritable, Text, Text, Text> {
 		private Text zone = new Text();
 		private Text coordinates = new Text();
@@ -126,6 +131,7 @@ public class PointCleaner extends Configured implements Tool {
 					zone.set("-1zoneX_zoneY");
 				} else
 					zone.set(calculateZone(tokens));
+				//System.out.println("zone: " + zone + " coord: " + coordinates);
 				context.write(zone, coordinates);
 			}
 		}
@@ -147,7 +153,7 @@ public class PointCleaner extends Configured implements Tool {
 		}
 	}
 
-	public static class MovieYearReducer extends
+	public static class ZoneCleanReducer extends
 			Reducer<Text, Text, Text, Text> {
 		private Text outTxt = new Text("placeholder");
 		private Text empty = new Text("");
@@ -156,16 +162,16 @@ public class PointCleaner extends Configured implements Tool {
 		@Override
 		public void reduce(Text zone, Iterable<Text> values, Context context)
 				throws IOException, InterruptedException {
+			
 			clearArray(grid);
-
 			String[] tokens = zone.toString().replace("\t", "").split("_");
 			int zoneX = Integer.parseInt(tokens[0]);
 			int zoneY = Integer.parseInt(tokens[1]);
-
+			
 			for (Text val : values) {
-				writePointsIntoArray(val, zoneX, zoneY);
+				writePointsIntoArray(val, zoneX, zoneY, grid);
 			}
-			deleteIsolatedPoints();
+			deleteIsolatedPoints(grid);
 
 			StringBuilder sb = new StringBuilder(300);
 			int last = grid.length;
@@ -184,21 +190,21 @@ public class PointCleaner extends Configured implements Tool {
 			}
 		}
 
-		private void deleteIsolatedPoints() {
+		private void deleteIsolatedPoints(int[][] grid) {
 			int last = grid.length - 2; // assume square grid only for now
 			// for loops are inset so we don't analyze anything on the borders
 			// will get them on the 2nd MR run
 
 			for (int i = 1; i < last; i++) {
 				for (int j = 1; j < last; j++) {
-					if (grid[j][i] == 1 && hasNeighbor(i, j) == false) {
+					if (grid[j][i] == 1 && hasNeighbor(i, j, grid) == false) {
 						grid[j][i] = 0;
 					}
 				}
 			}
 		}
 
-		private boolean hasNeighbor(int j, int i) {
+		private boolean hasNeighbor(int j, int i, int[][] grid) {
 			if (grid[i - 1][j] == 1 //
 					|| grid[i + 1][j] == 1 //
 					|| grid[i - 1][j - 1] == 1 //
@@ -212,7 +218,7 @@ public class PointCleaner extends Configured implements Tool {
 				return false;
 		}
 
-		private void writePointsIntoArray(Text val, int zoneX, int zoneY) {
+		private void writePointsIntoArray(Text val, int zoneX, int zoneY, int[][] grid) {
 			String[] tokens = val.toString().replace("\t", "").split("_");
 			int pointX = -1, pointY = -1;
 
@@ -227,7 +233,7 @@ public class PointCleaner extends Configured implements Tool {
 			grid[pointY + arrayShift - 30 * zoneY][pointX + arrayShift - 30
 					* zoneX] = 1;
 		}
-
+		
 		private void clearArray(int[][] grid) {
 			for (int[] row : grid)
 				Arrays.fill(row, 0);

@@ -1,5 +1,15 @@
 package jsoper.pair.s10cluster;
 
+/**
+ * This program is the tenth part of the Big Data 12 Step Program
+ *
+ * It performs a K-means clustering on the bitmap with k=7, which
+ * is one cluster per letter
+ *
+ * @author John Soper
+ *
+ */
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -10,13 +20,18 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
 import org.apache.mahout.clustering.WeightedVectorWritable;
 import org.apache.mahout.clustering.kmeans.Cluster;
 import org.apache.mahout.clustering.kmeans.KMeansDriver;
@@ -24,14 +39,11 @@ import org.apache.mahout.common.distance.EuclideanDistanceMeasure;
 import org.apache.mahout.math.RandomAccessSparseVector;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.VectorWritable;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
-
-public class KMeansClustering {
+public class KMeansClustering extends Configured implements Tool {
 	private static final Log LOG = LogFactory.getLog(KMeansClustering.class);
 
-	void writePointsToFile(List<Vector> points, String fileName, FileSystem fs,
+	void writePointsToSeqFile(List<Vector> points, String fileName, FileSystem fs,
 			Configuration conf) {
 		Path path = new Path(fileName);
 		try (SequenceFile.Writer writer = new SequenceFile.Writer(fs, conf,
@@ -61,25 +73,25 @@ public class KMeansClustering {
 		return points;
 	}
 
-	String getCorrectLetter(double x, double y) {
-		if (y > 60) {
-			if (x < 45)
-				return "B";
-			else if (x > 72)
-				return "G";
-			else
-				return "I";
-		} else {
-			if (x < 40)
-				return "D";
-			else if (x < 60)
-				return "A1";
-			else if (x < 80)
-				return "T";
-			else
-				return "A2";
-		}
-	}
+//	String getCorrectLetter(double x, double y) {
+//		if (y > 60) {
+//			if (x < 45)
+//				return "B";
+//			else if (x > 72)
+//				return "G";
+//			else
+//				return "I";
+//		} else {
+//			if (x < 40)
+//				return "D";
+//			else if (x < 60)
+//				return "A1";
+//			else if (x < 80)
+//				return "T";
+//			else
+//				return "A2";
+//		}
+//	}
 
 	void chooseInitialCenterValues(double[][] initCtrs) {
 		initCtrs[0][0] = 40;
@@ -98,11 +110,8 @@ public class KMeansClustering {
 		initCtrs[6][1] = 20;
 	}
 
-	void readCsvData(double[][] fpoints) {
-
-		try (BufferedReader br = new BufferedReader(new FileReader("./out_s9/s9out.csv"))) {
-//	    try (BufferedReader br = new BufferedReader(new FileReader("./out_s9/final/part-r-00000"))) {
-
+	void readCsvData(double[][] fpoints, String inputFile) {
+		try (BufferedReader br = new BufferedReader(new FileReader(inputFile))) {
 			String line = br.readLine();
 			int row = 0;
 
@@ -173,8 +182,10 @@ public class KMeansClustering {
 					.println("\n\n****** S10 parsing error on value to double\n\n");
 			e.printStackTrace();
 		}
-		LOG.info(value.toString() + " belongs to cluster " + key.toString()
-				+ " Letter: " + getCorrectLetter(x, y));
+		LOG.info(value.toString() + " belongs to cluster " + key.toString());
+		
+		//LOG.info(value.toString() + " belongs to cluster " + key.toString()
+		//	+ " Letter: " + getCorrectLetter(x, y));
 		return ("" + x + "," + y + "," + key.toString() + "\n");
 	}
 
@@ -218,17 +229,16 @@ public class KMeansClustering {
 		return fs;
 	}
 
-	void writeCsvOutputFile(String str) {
+	void writeCsvOutputFile(String str, String outputFile) {
 		try {
-			Files.write(Paths.get("./out_s10/s10out.csv"), str.getBytes());
-			//Files.write(Paths.get("./s10aout.csv"), str.getBytes());
+			Files.write(Paths.get(outputFile), str.getBytes());
 		} catch (IOException e) {
 			System.out.println("Problem writing s10out.csv");
 			e.printStackTrace();
 		}
 	}
 
-	void go() {
+	public int run(String[] args) throws Exception {
 		// change below dimensions to command line arguments if
 		// more general behavior is ever needed
 		// chooseInitialCenterValues also has hardcoded values
@@ -242,9 +252,9 @@ public class KMeansClustering {
 		FileSystem fs = allocateFileSystem(conf);
 
 		// transfer data points from csv file to sequence file
-		readCsvData(dataPoints);
+		readCsvData(dataPoints, args[0]);
 		List<Vector> dataVectors = vectorize(dataPoints);
-		writePointsToFile(dataVectors, "testdata/points/file1", fs, conf);
+		writePointsToSeqFile(dataVectors, "testdata/points/file1", fs, conf);
 
 		// set beginning cluster values
 		chooseInitialCenterValues(initialClusCenters);
@@ -254,14 +264,16 @@ public class KMeansClustering {
 		// perform k-means algorithm
 		runKMeansAlgorithm(conf, fs);
 
-		// Write points and clusters numbers to CSV file
+		// Write points and clusters IDs to CSV file
 		String str = new String(readAllClusterValues(conf, fs));
-		writeCsvOutputFile(str);
-		System.out.println("done with Step 10");
+		writeCsvOutputFile(str, args[1]);
+		
+		return 1;
 	}
 
-	public static void main(String args[]) {
-		new KMeansClustering().go();
+	public static void main(String args[]) throws Exception {
+		int exitCode = ToolRunner.run(new KMeansClustering(), args);
+		System.exit(exitCode);
 	}
 
 }
